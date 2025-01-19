@@ -9,6 +9,7 @@ stages:
   - provision
   - deploy
   - health-check
+  - Roll back
 
 variables:
   DB_HOST: "localhost"
