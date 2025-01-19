@@ -3,6 +3,7 @@ Action Items,
 1. Provision: Create the Postgres database.
 2. Deploy: Deploy the web application to Minikube.
 3. Health-check: Verify if the application is running correctly using the health endpoint.
+4. Roll back in case of failure
 --------------------------------------------script starts here-------------------------------------------------------
 stages:
   - provision
@@ -12,9 +13,8 @@ stages:
 variables:
   DB_HOST: "localhost"
   DB_PORT: 5432
-  DB_USER: "Project-webapp_user"
-  DB_NAME: "Project-webapp _db"
-  DB_PASSWORD_FILE: "/tmp/db_password.txt"
+  DB_NAME: "Project-webapp_db"
+  
 
 before_script:
   - echo "Starting CI/CD pipeline"
@@ -23,7 +23,8 @@ provision_db:
   stage: provision
   image: hashicorp/terraform:latest
   script:
-    - terraform init 
+    - terraform init
+	- terraform plan
     - terraform apply -auto-approve
     - export DB_PASSWORD=$(terraform output -raw db_password)
     - export DB_USER=$(terraform output -raw db_username)
@@ -46,5 +47,18 @@ health_check:
   script:
     - curl --fail http://localhost:8080/health
     - curl --fail http://localhost:8080/db-health
+	
+# Rollback if something fails
+rollback:
+  stage: rollback
+  image: hashicorp/terraform:latest
+  script:
+    - echo "Rolling back deployment and provisioning..."
+    # Destroy Terraform-managed resources
+    - terraform destroy -auto-approve
+    # Delete Kubernetes resources
+    - kubectl delete -f deployment.yaml || true
+    - kubectl delete secret db-credentials || true
+  when: on_failure
 
 --------------------------------------------script ends here-------------------------------------------------------
