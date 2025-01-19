@@ -1,10 +1,6 @@
-
-
-
-
-1.Prometheus to monitor the health of the web application and database connection.
-2.Alertmanager will send notifications if the web application becomes unhealthy (e.g database connection fails).
-3.Exposed application metrics using prometheus_client in the Flask app.
+Prometheus to monitor the health of the web application and database connection.
+Alertmanager will send notifications if the web application becomes unhealthy (e.g database connection fails).
+Exposed application metrics using prometheus_client in the Flask app.
 
 
 
