@@ -25,7 +25,7 @@ provision_db:
   image: hashicorp/terraform:latest
   script:
     - terraform init
-	- terraform plan
+    - terraform plan
     - terraform apply -auto-approve
     - export DB_PASSWORD=$(terraform output -raw db_password)
     - export DB_USER=$(terraform output -raw db_username)
@@ -39,8 +39,8 @@ deploy_app:
   stage: deploy
   image: kubernetes/kubectl:latest
   script:
-    - kubectl apply -f deployment.yaml
-    - kubectl rollout status deployment/myapp
+    - kubectl apply -f kubernetes.yml
+    - kubectl rollout status deployment/project-webapp
 
 health_check:
   stage: health-check
