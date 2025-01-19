@@ -1,0 +1,73 @@
+Kubernetes Deployment for the Web Application:
+
+
+--------------------------------------------script starts here--------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: Project-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: Project-webapp
+  template:
+    metadata:
+      labels:
+        app: Project-webapp
+    spec:
+      containers:
+      - name: Project-webapp-container
+        image: Project-webapp_image:latest
+        env:
+        - name: DB_HOST
+          value: "localhost"  
+        - name: DB_PORT
+          value: "5432"  #DB_PORT
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials  # Using the db-credentials secret
+              key: username         # Fetching the DB username from the secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials  # Using the db-credentials secret
+              key: password         # Fetching the DB password from the secret
+        - name: DB_NAME
+          value: "Project-webapp_db"  
+        ports:
+        - containerPort: 8080
+        
+         # Readiness probe to check if the application is ready to serve traffic
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        # Liveness probe to check if the application is still alive and should be restarted
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: Project-webapp-service
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: Project-webapp
+
+--------------------------------------------script ends here----------------------------------------------------------
