@@ -1,0 +1,50 @@
+Below is the GITLAB CI provisioning for the web app – Project-webapp
+Action Items,
+1. Provision: Create the Postgres database.
+2. Deploy: Deploy the web application to Minikube.
+3. Health-check: Verify if the application is running correctly using the health endpoint.
+--------------------------------------------script starts here-------------------------------------------------------
+stages:
+  - provision
+  - deploy
+  - health-check
+
+variables:
+  DB_HOST: "localhost"
+  DB_PORT: 5432
+  DB_USER: "Project-webapp_user"
+  DB_NAME: "Project-webapp _db"
+  DB_PASSWORD_FILE: "/tmp/db_password.txt"
+
+before_script:
+  - echo "Starting CI/CD pipeline"
+
+provision_db:
+  stage: provision
+  image: hashicorp/terraform:latest
+  script:
+    - terraform init 
+    - terraform apply -auto-approve
+    - export DB_PASSWORD=$(terraform output -raw db_password)
+    - export DB_USER=$(terraform output -raw db_username)
+    - kubectl create secret generic db-credentials \
+        --from-literal=password=$DB_PASSWORD \
+        --from-literal=username=$DB_USER
+  secrets:
+    DATABASE_PASSWORD: $DB_PASSWORD
+
+deploy_app:
+  stage: deploy
+  image: kubernetes/kubectl:latest
+  script:
+    - kubectl apply -f deployment.yaml
+    - kubectl rollout status deployment/myapp
+
+health_check:
+  stage: health-check
+  image: curlimages/curl:latest
+  script:
+    - curl --fail http://localhost:8080/health
+    - curl --fail http://localhost:8080/db-health
+
+--------------------------------------------script ends here-------------------------------------------------------
