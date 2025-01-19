@@ -1,5 +1,5 @@
 # main.tf
-
+--------------------------------------------script starts here-------------------------------------------------------
 provider "postgresql" {
   host     = var.db_host
   port     = var.db_port
@@ -49,6 +49,8 @@ output "db_password" {
 output "db_host" {
   value = var.db_host
 }
+
+--------------------------------------------script ends here-------------------------------------------------------
 
 
 
