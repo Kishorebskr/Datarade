@@ -1,10 +1,10 @@
 
 Following Iterations are involved in this repository to acheive the automation pipeline for DB provision of web-app with additional health check services.
 
-Assumtions
-webapp name - project-webapp
-DB port - 5432
-app port - 8080
+Assumtions:
+- webapp name - project-webapp
+- DB port - 5432
+- app port - 8080
 
 -------------------------------------------------------------------------------------------------------------
 1. GITLAB CI
