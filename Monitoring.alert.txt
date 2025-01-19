@@ -1,0 +1,257 @@
+
+
+
+
+1.Prometheus to monitor the health of the web application and database connection.
+2.Alertmanager will send notifications if the web application becomes unhealthy (e.g database connection fails).
+3.Exposed application metrics using prometheus_client in the Flask app.
+
+
+
+--------------------------------------------script starts here--------------------------------------------------------
+# Set Up Prometheus for Monitoring
+-----------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.40.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+            - "--web.console.libraries=/etc/prometheus/console_libraries"
+            - "--web.console.templates=/etc/prometheus/consoles"
+          ports:
+            - name: web
+              containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+            - name: prometheus-data
+              mountPath: /prometheus
+  volumeMounts:
+    - name: prometheus-config
+      mountPath: /etc/prometheus
+    - name: prometheus-data
+      mountPath: /prometheus
+  volumes:
+    - name: prometheus-config
+      configMap:
+        name: prometheus-config
+    - name: prometheus-data
+      emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP
+
+
+#Prometheus ConfigMap
+-----------------------------------
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  labels:
+    app: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_label_kubernetes_io_hostname]
+            target_label: instance
+
+      - job_name: 'Project-webapp-health'
+        metrics_path: '/metrics'
+        static_configs:
+          - targets: ['mock-Project-webapp:8080']
+
+      - job_name: 'kubernetes-service-endpoints'
+        kubernetes_sd_configs:
+          - role: endpoints
+
+# prometheus service 
+-----------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP
+
+# Modify app.py to Expose Metrics
+-----------------------------------
+
+from prometheus_client import start_http_server, Summary, Gauge
+import time
+import os
+import psycopg2
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+# Create metrics
+DB_CONNECTION_STATUS = Gauge('db_connection_status', 'Status of the DB connection')
+
+def check_db_connection():
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            dbname="mydatabase"
+        )
+        DB_CONNECTION_STATUS.set(1)  # Healthy
+        return True
+    except Exception as e:
+        DB_CONNECTION_STATUS.set(0)  # Unhealthy
+        print(f"Error connecting to DB: {e}")
+        return False
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    if check_db_connection():
+        return jsonify({"status": "healthy"}), 200
+    else:
+        return jsonify({"status": "unhealthy"}), 500
+
+if __name__ == "__main__":
+    # Start Prometheus metrics server
+    start_http_server(8000)  # Expose metrics on port 8000
+    app.run(debug=True, host="0.0.0.0", port=8080)
+
+
+#setup alert manager
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.24.0
+          ports:
+            - containerPort: 9093
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - protocol: TCP
+      port: 9093
+      targetPort: 9093
+  type: ClusterIP
+
+# Alertmanager ConfigMap
+-----------------------------------
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  labels:
+    app: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ['alertname']
+      receiver: 'email'
+
+    receivers:
+      - name: 'email'
+        email_configs:
+          - to: 'email@example.com'
+            send_resolved: true
+
+
+# Configure Prometheus to Send Alerts
+--------------------------------------
+
+groups:
+  - name: Project-webapp-alerts
+    rules:
+      - alert: WebAppUnhealthy
+        expr: db_connection_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Web application is unhealthy"
+          description: "The database connection could not be established."
+
+
+# Deploy Prometheus and Alertmanager
+-------------------------------------
+
+kubectl apply -f prometheus.yaml
+kubectl apply -f prometheus-configmap.yaml
+kubectl apply -f alertmanager.yaml
+kubectl apply -f alertmanager-configmap.yaml
+kubectl apply -f prometheus-alerts.yaml
+
+# Access Prometheus and Alertmanager
+-------------------------------------
+Once everything is deployed, will able to access Prometheus and Alertmanager via their respective services:
+
+Prometheus: kubectl port-forward svc/prometheus 9090:9090
+Alertmanager: kubectl port-forward svc/alertmanager 9093:9093
+
+
+--------------------------------------------script ends here----------------------------------------------------------
