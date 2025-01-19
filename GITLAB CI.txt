@@ -58,7 +58,7 @@ rollback:
     # Destroy Terraform-managed resources
     - terraform destroy -auto-approve
     # Delete Kubernetes resources
-    - kubectl delete -f deployment.yaml || true
+    - kubectl delete -f kubernetes.yml || true
     - kubectl delete secret db-credentials || true
   when: on_failure
 
