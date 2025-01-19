@@ -1,5 +1,5 @@
 # variables.tf
-
+--------------------------------------------script ends here-------------------------------------------------------
 variable "db_host" {
   description = "The host of the PostgreSQL database"
   type        = string
@@ -29,3 +29,5 @@ variable "db_user" {
   type        = string
   default     = "Project-webapp_user"
 }
+
+--------------------------------------------script ends here-------------------------------------------------------
